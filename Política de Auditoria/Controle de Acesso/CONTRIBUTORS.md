@@ -4,6 +4,6 @@ Para mais informações ou questões relacionadas ao script de hardening SMB, en
 
 ## Developers:
 
-- [Larissa Castro](larissa.castro@esecurity.com.br)
-- [Giovanna Frutero](giovanna.frutero@esecurity.com.br)
+- [Larissa Castro] - larissa.castro@esecurity.com.br
+- [Giovanna Frutero] - giovanna.frutero@esecurity.com.br
 
