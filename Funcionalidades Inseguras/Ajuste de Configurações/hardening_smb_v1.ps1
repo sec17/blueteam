@@ -8,7 +8,7 @@
 
     LinkedIn:
       - Larissa Castro Correa: https://linkedin.com/in/larissa-castro-correa
-      - Giovanna Frutero: https://www.linkedin.com/in/fruterogiovanna
+      - Giovanna Frutero: https://linkedin.com/in/fruterogiovanna
 
 .VERSION
     Versão 1.0
