@@ -1,11 +1,9 @@
 <#
-.SYNOPSIS
+
+.DESCRIPTION
+
     Script de hardening SMB para sistemas operacionais Windows 10 e 11.
     
-.AUTHORS
-    Larissa Castro Correa
-    Giovanna Frutero
-
 .CONTACT
 
     LinkedIn:
