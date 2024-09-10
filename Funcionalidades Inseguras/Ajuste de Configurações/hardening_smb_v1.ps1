@@ -1,3 +1,22 @@
+<#
+.SYNOPSIS
+    Script de hardening SMB para sistemas operacionais Windows 10 e 11.
+    
+.AUTHORS
+    Larissa Castro Correa
+    Giovanna Frutero
+
+.CONTACT
+
+    LinkedIn:
+      - Larissa Castro Correa: [http://linkedin.com/in/larissa-castro-correa](http://linkedin.com/in/larissa-castro-correa)
+      - Giovanna Frutero: [www.linkedin.com/in/fruterogiovanna](http://www.linkedin.com/in/fruterogiovanna)
+
+.VERSION
+    Versão 1.0
+#>
+
+
 # Verifica se o script está sendo executado com privilégios de administrador
 If (-Not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
     Write-Warning "Este script precisa ser executado como administrador."
