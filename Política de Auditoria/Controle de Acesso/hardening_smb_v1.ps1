@@ -1,29 +1,37 @@
-# Verifica se o script est· sendo executado com privilÈgios de administrador
+# Verifica se o script est√° sendo executado com privil√©gios de administrador
 If (-Not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
     Write-Warning "Este script precisa ser executado como administrador."
     Exit
 }
 
-# FunÁ„o para verificar o status do SMB
+# Fun√ß√£o para verificar o status do SMB
 Function Check-SMBStatus {
-    Write-Output "`nVerificando status do SMB..."
+    Write-Output "Verificando status do SMB..."
 
-    # Verifica se SMBv1 est· instalado
+    # Verifica se SMBv1 est√° instalado
     $smbv1Status = Get-WindowsOptionalFeature -Online -FeatureName "SMB1Protocol"
     Write-Output "SMBv1 Status: $($smbv1Status.State)"
 
-    # Verifica se SMBv2 e SMBv3 est„o habilitados
+    # Verifica se SMBv2 e SMBv3 est√£o habilitados
     $smbv2Status = Get-SmbServerConfiguration | Select-Object -ExpandProperty EnableSMB2Protocol
     If ($smbv2Status) {
-        Write-Output "SMBv2/v3 est· habilitado."
+        Write-Output "SMBv2/v3 est√° habilitado."
     } Else {
-        Write-Output "SMBv2/v3 est· desabilitado."
+        Write-Output "SMBv2/v3 est√° desabilitado."
     }
+
+    # Verifica o status do SMB Signing
+    Write-Output "Verificando configura√ß√£o do SMB Signing..."
+    $clientSigning = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters' | Select-Object -ExpandProperty EnableSecuritySignature
+    $serverSigning = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters' | Select-Object -ExpandProperty EnableSecuritySignature
+
+    Write-Output "SMB Signing no Cliente: $clientSigning"
+    Write-Output "SMB Signing no Servidor: $serverSigning"
 }
 
-# FunÁ„o para desabilitar SMBv1
+# Fun√ß√£o para desabilitar SMBv1
 Function Disable-SMBv1 {
-    Write-Output "`nDesabilitando SMBv1..."
+    Write-Output "Desabilitando SMBv1..."
 
     # Desativa o SMBv1 sem reiniciar imediatamente
     Disable-WindowsOptionalFeature -Online -FeatureName "SMB1Protocol" -NoRestart -ErrorAction SilentlyContinue
@@ -40,9 +48,9 @@ Function Disable-SMBv1 {
     }
 }
 
-# FunÁ„o para habilitar a criptografia para SMBv2/v3
+# Fun√ß√£o para habilitar a criptografia para SMBv2/v3
 Function Enable-SMBEncryption {
-    Write-Output "`nHabilitando criptografia para SMBv2/v3..."
+    Write-Output "Habilitando criptografia para SMBv2/v3..."
 
     # Habilita a criptografia SMBv2 e SMBv3
     Set-SmbServerConfiguration -EncryptData $true -Force
@@ -59,11 +67,11 @@ Function Enable-SMBEncryption {
     }
 }
 
-# FunÁ„o para bloquear SMB no firewall
+# Fun√ß√£o para bloquear SMB no firewall
 Function Block-SMBFirewall {
-    $response = Read-Host "`nVocÍ deseja bloquear SMB no firewall? (S/N)"
+    $response = Read-Host "Voc√™ deseja bloquear SMB no firewall? (S/N)"
     If ($response -eq "S" -or $response -eq "s") {
-        Write-Output "`nBloqueando SMB no firewall..."
+        Write-Output "Bloqueando SMB no firewall..."
 
         # Bloqueia portas SMB no firewall (137, 138, 139, 445)
         $firewallRules = @("137", "138", "139", "445")
@@ -77,83 +85,71 @@ Function Block-SMBFirewall {
         # Salva o progresso para retomar depois
         Set-ItemProperty -Path "HKCU:\Software\SMB_Hardening" -Name "StepCompleted" -Value "BlockSMBFirewall"
     } Else {
-        Write-Output "`nBloqueio de SMB no firewall cancelado pelo usu·rio."
+        Write-Output "Bloqueio de SMB no firewall cancelado pelo usu√°rio."
     }
 }
 
-# FunÁ„o para verificar o status do firewall SMB
-Function Check-FirewallSMB {
-    Write-Output "`nVerificando status do SMB no firewall..."
+# Fun√ß√£o para habilitar o SMB Signing
+Function Enable-SMBSigning {
+    Write-Output "Habilitando SMB Signing..."
 
-    $firewallRules = Get-NetFirewallRule | Where-Object { $_.DisplayName -like "Block SMB*" }
-    If ($firewallRules) {
-        Write-Output "SMB est· bloqueado no firewall."
-        $response = Read-Host "VocÍ deseja habilitar SMB no firewall novamente? (S/N)"
-        If ($response -eq "S" -or $response -eq "s") {
-            Write-Output "`nHabilitando SMB no firewall..."
+    # Habilita o SMB Signing no cliente
+    Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters' -Name EnableSecuritySignature -Value 1
+    # Habilita o SMB Signing no servidor
+    Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters' -Name EnableSecuritySignature -Value 1
 
-            # Remove as regras de bloqueio de SMB
-            ForEach ($rule in $firewallRules) {
-                Remove-NetFirewallRule -Name $rule.Name -ErrorAction SilentlyContinue
-            }
+    # Verifica se o SMB Signing foi habilitado
+    $clientSigning = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters' | Select-Object -ExpandProperty EnableSecuritySignature
+    $serverSigning = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters' | Select-Object -ExpandProperty EnableSecuritySignature
 
-            Write-Output "Regras de firewall removidas para permitir SMB."
-
-            # Salva o progresso para retomar depois
-            Set-ItemProperty -Path "HKCU:\Software\SMB_Hardening" -Name "StepCompleted" -Value "EnableSMBFirewall"
-            # Define que uma reinicializaÁ„o È necess·ria
-            $restartRequired = $true
-        } Else {
-            Write-Output "`nSMB permanecer· bloqueado no firewall."
-        }
+    If ($clientSigning -eq 1 -and $serverSigning -eq 1) {
+        Write-Output "SMB Signing habilitado com sucesso."
+        # Salva o progresso para retomar depois
+        Set-ItemProperty -Path "HKCU:\Software\SMB_Hardening" -Name "StepCompleted" -Value "EnableSMBSigning"
     } Else {
-        Write-Output "SMB n„o est· bloqueado no firewall."
+        Write-Output "Falha ao habilitar SMB Signing."
     }
 }
 
-# FunÁ„o para verificar o progresso salvo e retomar a execuÁ„o
+# Fun√ß√£o para verificar o progresso salvo e retomar a execu√ß√£o
 Function Continue-AfterRestart {
     If (-Not (Test-Path "HKCU:\Software\SMB_Hardening")) {
         New-Item -Path "HKCU:\Software\SMB_Hardening" -Force | Out-Null
     }
 
     $stepCompleted = Get-ItemProperty -Path "HKCU:\Software\SMB_Hardening" -Name "StepCompleted" -ErrorAction SilentlyContinue
-    $restartRequired = $false
 
     If ($stepCompleted -eq "DisableSMBv1") {
-        Write-Output "`nRetomando apÛs desativaÁ„o do SMBv1..."
+        Write-Output "Retomando ap√≥s desativa√ß√£o do SMBv1..."
         Enable-SMBEncryption
+        Enable-SMBSigning
         Block-SMBFirewall
-        Check-FirewallSMB
-        Write-Output "`nHardening de SMB concluÌdo."
-        $restartRequired = $true
+        Write-Output "Hardening de SMB conclu√≠do. Reinicie o sistema para aplicar as altera√ß√µes."
+        Restart-Computer -Force
     } ElseIf ($stepCompleted -eq "EnableSMBEncryption") {
-        Write-Output "`nRetomando apÛs habilitaÁ„o da criptografia para SMBv2/v3..."
+        Write-Output "Retomando ap√≥s habilita√ß√£o da criptografia para SMBv2/v3..."
+        Enable-SMBSigning
         Block-SMBFirewall
-        Check-FirewallSMB
-        Write-Output "`nHardening de SMB concluÌdo."
-        $restartRequired = $true
+        Write-Output "Hardening de SMB conclu√≠do. Reinicie o sistema para aplicar as altera√ß√µes."
+        Restart-Computer -Force
+    } ElseIf ($stepCompleted -eq "EnableSMBSigning") {
+        Write-Output "Retomando ap√≥s habilita√ß√£o do SMB Signing..."
+        Block-SMBFirewall
+        Write-Output "Hardening de SMB conclu√≠do. Reinicie o sistema para aplicar as altera√ß√µes."
+        Restart-Computer -Force
     } ElseIf ($stepCompleted -eq "BlockSMBFirewall") {
-        Write-Output "`nTodas as etapas j· foram concluÌdas anteriormente. Reinicie o sistema para aplicar as alteraÁıes."
-    } ElseIf ($stepCompleted -eq "EnableSMBFirewall") {
-        Write-Output "`nRetomando apÛs habilitaÁ„o do SMB no firewall..."
-        Write-Output "`nHardening de SMB concluÌdo."
+        Write-Output "Todas as etapas j√° foram conclu√≠das anteriormente. Reinicie o sistema para aplicar as altera√ß√µes."
     } Else {
-        Write-Output "`nExecutando todos os passos de hardening."
+        Write-Output "Executando todos os passos de hardening."
         Check-SMBStatus
         Disable-SMBv1
         Enable-SMBEncryption
+        Enable-SMBSigning
         Block-SMBFirewall
-        Check-FirewallSMB
-        Write-Output "`nHardening de SMB concluÌdo."
-        $restartRequired = $true
-    }
-
-    If ($restartRequired) {
-        Write-Output "`nReiniciando o sistema para aplicar as alteraÁıes..."
+        Write-Output "Hardening de SMB conclu√≠do. Reinicie o sistema para aplicar as altera√ß√µes."
         Restart-Computer -Force
     }
 }
 
-# ExecuÁ„o principal
+# Execu√ß√£o principal
 Continue-AfterRestart
